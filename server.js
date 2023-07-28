@@ -1,52 +1,109 @@
 const net = require("node:net");
 
-const validateGuess = (guess, number) => {
-  if (guess === number) return 0;
-  if (guess < number) return -1;
-  return 1;
-};
+class Game {
+  #randomNumber;
+  #chancesLeft;
+  #guesses;
+
+  constructor(randomNumber, maxChances) {
+    this.#randomNumber = randomNumber;
+    this.#chancesLeft = maxChances;
+    this.#guesses = [];
+  }
+
+  #isGuessCorrect(a, b) {
+    return a === b;
+  }
+
+  #isSmaller(a, b) {
+    return a < b;
+  }
+
+  #isGreater(a, b) {
+    return a > b;
+  }
+
+  consolidateGuess(guess) {
+    this.#chancesLeft--;
+    this.#guesses.push(guess);
+  }
+
+  #generateResultMessage() {
+    const guess = this.#guesses.at(-1);
+
+    switch (true) {
+      case this.#isGuessCorrect(guess, this.#randomNumber):
+        return "accurate";
+      case this.#isSmaller(guess, this.#randomNumber):
+        return "too small";
+      case this.#isGreater(guess, this.#randomNumber):
+        return "too high";
+    }
+  }
+
+  #noChancesLeft() {
+    return this.#chancesLeft === 0;
+  }
+
+  #hasWon() {
+    return this.#guesses.at(-1) === this.#randomNumber;
+  }
+
+  status() {
+    return {
+      resultMsg: this.#generateResultMessage(),
+      hasWon: this.#hasWon(),
+      hasLost: this.#noChancesLeft(),
+      answer: this.#randomNumber,
+    };
+  }
+}
 
 const generateRandomNumber = (upperLimit) => {
-  // return Math.ceil(Math.random() * upperLimit);
-  return 5;
+  return Math.ceil(Math.random() * upperLimit);
 };
 
-const displayResult = (result, chancesLeft, socket) => {
-  if (chancesLeft === 0) {
-    socket.write("game over\n");
-    socket.end();
+const displayResult = ({ hasLost, hasWon, resultMsg, answer }, client) => {
+  const newLine = "\n";
+
+  if (hasLost) {
+    const gameOverMsg = "Game over" + newLine;
+    const correctAnswerMsg = `Correct answer was ${answer}` + newLine;
+
+    client.write(gameOverMsg + correctAnswerMsg);
+    client.end();
     return;
   }
 
-  if (result === 0) {
-    socket.write("accurate\n");
-    socket.end();
-    return;
-  }
+  client.write(`${resultMsg}\n`);
 
-  const message = result === -1 ? "too low" : "too high";
-  socket.write(`${message}\n`);
+  if (hasWon) {
+    const gameWonMsg = "You won!!" + newLine;
+    client.write(gameWonMsg);
+    client.end();
+  }
 };
 
-const startGame = (socket, maxChances, maxNumber) => {
-  let chancesLeft = maxChances;
-  const randomNumber = generateRandomNumber(maxNumber);
+const startGame = (client, maxChances, threshold) => {
+  const randomNumber = generateRandomNumber(threshold);
+  const game = new Game(randomNumber, maxChances);
 
-  socket.setEncoding("utf8");
-  socket.write(`Guess a random number between 1 to ${maxNumber}\n`);
+  client.setEncoding("utf8");
+  client.write(`Guess a random number between 1 to ${threshold}\n`);
 
-  socket.on("data", (data) => {
-    chancesLeft--;
+  client.on("data", (data) => {
     const guess = parseInt(data);
-    const result = validateGuess(guess, randomNumber);
-    displayResult(result, chancesLeft, socket);
+    game.consolidateGuess(guess);
+    displayResult(game.status(), client);
   });
 };
 
 const main = () => {
   const server = new net.createServer();
   server.listen(8000, () => console.log("Game starts..."));
-  server.on("connection", (socket) => startGame(socket, 5, 10));
+  const maxChances = 5;
+  const threshold = 10;
+  server.on("connection", (client) => startGame(client, maxChances, threshold));
 };
 
 main();
