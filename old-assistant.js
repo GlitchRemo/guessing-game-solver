@@ -3,25 +3,15 @@ const net = require("node:net");
 class Assistant {
   #suggestion;
   #clues;
-  #failedToGuess;
-  #guessedCorrectly;
+  #lastClue;
 
   constructor(initialSuggestion) {
     this.#suggestion = initialSuggestion;
     this.#clues = [];
-    this.#failedToGuess = false;
-    this.#guessedCorrectly = false;
   }
 
   consolidateClues(clue) {
-    if (clue.includes("over")) {
-      this.#failedToGuess = true;
-    }
-
-    if (clue.includes("accurate")) {
-      this.#guessedCorrectly = true;
-    }
-
+    this.#lastClue = clue;
     this.#clues.push(clue);
   }
 
@@ -38,13 +28,11 @@ class Assistant {
   }
 
   suggest() {
-    const clue = this.#clues.at(-1);
-
-    if (clue === "too small") {
+    if (this.#lastClue.small) {
       this.#suggestion = this.#generateLargerNumber();
     }
 
-    if (clue === "too high") {
+    if (this.#lastClue.large) {
       this.#suggestion = this.#generateSmallerNumber();
     }
 
@@ -53,6 +41,10 @@ class Assistant {
 }
 
 const startGuessing = (socket) => {
+  const lookup = {
+    "too small": { small: true, large: false },
+    "too high": { small: false, large: true },
+  };
   const initialSuggestion = 0;
   const assistant = new Assistant(initialSuggestion);
 
@@ -60,7 +52,8 @@ const startGuessing = (socket) => {
   socket.write(`Assistant>> ${initialSuggestion}\n`);
 
   socket.on("data", (data) => {
-    assistant.consolidateClues(data.trim());
+    const clue = lookup[data.trim()];
+    assistant.consolidateClues(clue);
 
     if (data.includes("over")) {
       socket.write("Opps!! We lost\n");
