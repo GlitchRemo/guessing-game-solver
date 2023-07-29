@@ -39,6 +39,7 @@ const main = () => {
     const lowerBound = 0;
     const upperBound = 10;
     const assistant = new Assistant(lowerBound, upperBound);
+
     const initialGuess = assistant.makeGuess();
     client.write(`${initialGuess}`);
     console.log(`Assistant guessed: ${initialGuess}`);

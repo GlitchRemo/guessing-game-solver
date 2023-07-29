@@ -72,6 +72,7 @@ const startGame = (client, maxChances, threshold) => {
 
   client.on("data", (data) => {
     const guess = parseInt(data);
+
     game.consolidateGuess(guess);
     const gameStatus = game.status();
     displayResult(gameStatus, guess);
