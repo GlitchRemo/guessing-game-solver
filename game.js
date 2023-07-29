@@ -3,86 +3,56 @@ const net = require("node:net");
 class Game {
   #randomNumber;
   #chancesLeft;
-  #guesses;
+  #hasWon;
 
   constructor(randomNumber, maxChances) {
     this.#randomNumber = randomNumber;
     this.#chancesLeft = maxChances;
-    this.#guesses = [];
+    this.#hasWon = false;
   }
 
-  consolidateGuess(guess) {
+  validateGuess(guess) {
     this.#chancesLeft--;
-    this.#guesses.push(guess);
-  }
+    this.#hasWon = guess === this.#randomNumber;
 
-  #generateResult() {
-    const guess = this.#guesses.at(-1);
     return {
       isSmaller: guess < this.#randomNumber,
       isLarger: guess > this.#randomNumber,
     };
   }
 
-  #noChancesLeft() {
+  noChancesLeft() {
     return this.#chancesLeft === 0;
   }
 
-  #hasWon() {
-    return this.#guesses.at(-1) === this.#randomNumber;
-  }
-
-  status() {
-    return {
-      guessResult: this.#generateResult(),
-      hasWon: this.#hasWon(),
-      hasLost: this.#noChancesLeft(),
-      correctAnswer: this.#randomNumber,
-    };
+  hasWon() {
+    return this.#hasWon;
   }
 }
 
-const generateRandomNumber = (upperLimit) => {
-  return Math.ceil(Math.random() * upperLimit);
+const generateRandomNumber = (min, max) => {
+  return min + Math.floor(Math.random() * (max - min));
 };
 
-const displayResult = (
-  { hasLost, hasWon, guessResult, correctAnswer },
-  guess
-) => {
-  if (hasLost) {
-    console.log(`Assistant lost. Correct Answer was ${correctAnswer}`);
-    return;
-  }
-
-  if (hasWon) {
-    console.log("Assistant won");
-    return;
-  }
-
-  const hint = guessResult.isSmaller ? "low" : "high";
-  console.log(`${guess} : ${hint}`);
-};
-
-const startGame = (client, maxChances, threshold) => {
-  const randomNumber = generateRandomNumber(threshold);
+const startGame = (client, maxChances, lowerLimit, upperLimit) => {
+  const randomNumber = generateRandomNumber(lowerLimit, upperLimit);
   const game = new Game(randomNumber, maxChances);
 
   client.setEncoding("utf8");
 
   client.on("data", (data) => {
     const guess = parseInt(data);
+    const feedback = game.validateGuess(guess);
 
-    game.consolidateGuess(guess);
-    const gameStatus = game.status();
-    displayResult(gameStatus, guess);
-
-    if (gameStatus.hasWon || gameStatus.hasLost) {
+    if (game.hasWon() || game.noChancesLeft()) {
+      const endgameMsg = game.hasWon() ? "won" : "lost";
+      console.log(`Assistant has ${endgameMsg} the game`);
       client.end();
       return;
     }
 
-    client.write(JSON.stringify(gameStatus.guessResult));
+    const gameStatus = { feedback };
+    client.write(JSON.stringify(gameStatus));
   });
 };
 
@@ -91,8 +61,11 @@ const main = () => {
   server.listen(8000, () => console.log("Game starts..."));
 
   const maxChances = 5;
-  const threshold = 10;
-  server.on("connection", (client) => startGame(client, maxChances, threshold));
+  const lowerLimit = 0;
+  const upperLimit = 10;
+  server.on("connection", (client) => {
+    startGame(client, maxChances, lowerLimit, upperLimit);
+  });
 };
 
 main();
