@@ -28,6 +28,10 @@ class Game {
   hasWon() {
     return this.#hasWon;
   }
+
+  get correctAnswer() {
+    return this.#randomNumber;
+  }
 }
 
 const generateRandomNumber = (min, max) => {
@@ -39,7 +43,6 @@ const startGame = (client, maxChances, lowerLimit, upperLimit) => {
   const game = new Game(randomNumber, maxChances);
 
   client.setEncoding("utf8");
-
   client.on("data", (data) => {
     const guess = parseInt(data);
     const feedback = game.validateGuess(guess);
@@ -47,6 +50,7 @@ const startGame = (client, maxChances, lowerLimit, upperLimit) => {
     if (game.hasWon() || game.noChancesLeft()) {
       const endgameMsg = game.hasWon() ? "won" : "lost";
       console.log(`Assistant has ${endgameMsg} the game`);
+      console.log(`Correct answer is ${game.correctAnswer}`);
       client.end();
       return;
     }
@@ -63,6 +67,7 @@ const main = () => {
   const maxChances = 5;
   const lowerLimit = 0;
   const upperLimit = 10;
+
   server.on("connection", (client) => {
     startGame(client, maxChances, lowerLimit, upperLimit);
   });

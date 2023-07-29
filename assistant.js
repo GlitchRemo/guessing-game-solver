@@ -3,6 +3,7 @@ const net = require("node:net");
 class Assistant {
   #lowerBound;
   #upperBound;
+  #guess;
 
   constructor(lowerBound, upperBound) {
     this.#lowerBound = lowerBound;
@@ -16,18 +17,17 @@ class Assistant {
     );
   }
 
-  consolidateFeedback(feedback) {
+  makeGuess(feedback = {}) {
     if (feedback.isSmaller) {
-      this.#lowerBound = guess + 1;
+      this.#lowerBound = this.#guess + 1;
     }
 
     if (feedback.isLarger) {
-      this.#upperBound = guess - 1;
+      this.#upperBound = this.#guess - 1;
     }
-  }
 
-  makeGuess() {
-    return this.#generateRandomNumber();
+    this.#guess = this.#generateRandomNumber();
+    return this.#guess;
   }
 }
 
@@ -44,8 +44,9 @@ const main = () => {
     client.write(`${initialGuess}`);
     console.log(`Assistant guessed: ${initialGuess}`);
 
-    client.on("data", (feedback) => {
-      const guess = assistant.makeGuess(JSON.parse(feedback));
+    client.on("data", (data) => {
+      const gameStatus = JSON.parse(data);
+      const guess = assistant.makeGuess(gameStatus.feedback);
       console.log(`Assistant guessed: ${guess}`);
       client.write(`${guess}`);
     });
